@@ -10,8 +10,23 @@ android {
         applicationId 'com.liderafest.tickets'
         minSdk 23
         targetSdk 35
-        versionCode 11
-        versionName '2.0.1-api-fix'
+        versionCode 12
+        versionName '2.0.2-inline-scanner'
+    }
+
+    signingConfigs {
+        debug {
+            storeFile file('lidera-debug.keystore')
+            storePassword 'lidera123'
+            keyAlias 'lidera'
+            keyPassword 'lidera123'
+        }
+    }
+
+    buildTypes {
+        debug {
+            signingConfig signingConfigs.debug
+        }
     }
 
     compileOptions {

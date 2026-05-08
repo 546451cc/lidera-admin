@@ -24,8 +24,11 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import com.google.zxing.integration.android.IntentIntegrator;
-import com.google.zxing.integration.android.IntentResult;
+import com.google.zxing.BarcodeFormat;
+import com.journeyapps.barcodescanner.BarcodeCallback;
+import com.journeyapps.barcodescanner.BarcodeResult;
+import com.journeyapps.barcodescanner.DecoratedBarcodeView;
+import com.journeyapps.barcodescanner.DefaultDecoderFactory;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -40,6 +43,7 @@ import java.io.OutputStreamWriter;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLEncoder;
+import java.util.Arrays;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -72,6 +76,9 @@ public class MainActivity extends Activity {
     private LinearLayout root;
     private ProgressBar progressBar;
     private TextView screenTitle;
+    private DecoratedBarcodeView barcodeView;
+    private boolean scannerActive = false;
+    private boolean scanHandled = false;
     private String pendingEmail;
     private String pendingPassword;
 
@@ -173,6 +180,7 @@ public class MainActivity extends Activity {
     }
 
     private void setContent(View view) {
+        stopScanner();
         while (root.getChildCount() > 2) {
             root.removeViewAt(2);
         }
@@ -515,32 +523,92 @@ public class MainActivity extends Activity {
             }
             return;
         }
-        IntentIntegrator integrator = new IntentIntegrator(this);
-        integrator.setCaptureActivity(LideraCaptureActivity.class);
-        integrator.setDesiredBarcodeFormats(IntentIntegrator.QR_CODE);
-        integrator.setPrompt("Escanea el QR del ticket");
-        integrator.setBeepEnabled(true);
-        integrator.setOrientationLocked(true);
+        showInlineScanner();
+    }
+
+    private void showInlineScanner() {
+        stopScanner();
+        screenTitle.setText("Escanear QR");
+        scanHandled = false;
+        scannerActive = true;
+
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setPadding(dp(14), dp(14), dp(14), dp(14) + systemBarBottomInset());
+        content.setBackgroundColor(BONE);
+
+        TextView hint = paragraph("Apunta la cámara al QR del ticket. La app hará check-in automáticamente cuando detecte un código válido.");
+        hint.setTextColor(CHARCOAL);
+        content.addView(hint);
+
+        barcodeView = new DecoratedBarcodeView(this);
+        barcodeView.getBarcodeView().setDecoderFactory(new DefaultDecoderFactory(Arrays.asList(BarcodeFormat.QR_CODE)));
+        barcodeView.setStatusText("Escaneando ticket...");
+        barcodeView.decodeContinuous(new BarcodeCallback() {
+            @Override
+            public void barcodeResult(BarcodeResult result) {
+                if (scanHandled || result == null || result.getText() == null) return;
+
+                String attendeeId = extractAttendeePublicId(result.getText());
+                scanHandled = true;
+                stopScanner();
+
+                if (isBlank(attendeeId)) {
+                    runOnUiThread(() -> showResult(false, "QR no reconocido", "Contenido leído: " + result.getText()));
+                } else {
+                    checkInAttendee(attendeeId);
+                }
+            }
+        });
+
+        content.addView(barcodeView, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1));
+
+        Button cancel = secondaryButton("Cancelar escaneo");
+        cancel.setOnClickListener(v -> showScannerDashboard());
+        content.addView(cancel);
+
+        while (root.getChildCount() > 2) {
+            root.removeViewAt(2);
+        }
+        root.addView(content, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1));
+
         try {
-            integrator.initiateScan();
+            barcodeView.resume();
         } catch (Exception ex) {
             showResult(false, "No se pudo abrir cámara", "Error: " + ex.getMessage());
         }
     }
 
+    private void stopScanner() {
+        if (barcodeView != null) {
+            try {
+                barcodeView.pause();
+            } catch (Exception ignored) { }
+            barcodeView = null;
+        }
+        scannerActive = false;
+    }
+
     @Override
-    protected void onActivityResult(int requestCode, int resultCode, android.content.Intent data) {
-        IntentResult result = IntentIntegrator.parseActivityResult(requestCode, resultCode, data);
-        if (result != null) {
-            if (result.getContents() == null) {
-                toast("Escaneo cancelado");
-            } else {
-                String attendeeId = extractAttendeePublicId(result.getContents());
-                if (isBlank(attendeeId)) {
-                    showResult(false, "QR no reconocido", "Contenido leído: " + result.getContents());
-                } else {
-                    checkInAttendee(attendeeId);
-                }
+    protected void onResume() {
+        super.onResume();
+        if (scannerActive && barcodeView != null) {
+            try {
+                barcodeView.resume();
+            } catch (Exception ignored) { }
+        }
+    }
+
+    @Override
+    protected void onPause() {
+        if (barcodeView != null) {
+            try {
+                barcodeView.pause();
+            } catch (Exception ignored) { }
+        }
+        super.onPause();
+    }
+
             }
             return;
         }
@@ -651,9 +719,9 @@ public class MainActivity extends Activity {
     private String extractAttendeePublicId(String raw) {
         if (raw == null) return "";
         String value = raw.trim();
-        if (value.matches("(?i)^A-[A-Z0-9_-]{3,}$")) return value;
+        if (value.matches("(?i)^A-[A-Z0-9_-]{3,}$")) return value.toUpperCase();
         Matcher matcher = Pattern.compile("(?i)(A-[A-Z0-9_-]{3,})").matcher(value);
-        if (matcher.find()) return matcher.group(1);
+        if (matcher.find()) return matcher.group(1).toUpperCase();
         return "";
     }
 
@@ -903,16 +971,8 @@ public class MainActivity extends Activity {
 
     @Override
     public void onBackPressed() {
-        if (!isBlank(currentListShortId)) {
-            currentListShortId = "";
-            currentListName = "";
-            prefs.edit().remove(KEY_LIST_SHORT_ID).remove(KEY_LIST_NAME).apply();
-            if (!isBlank(currentEventId)) loadCheckInLists(currentEventId, currentEventTitle); else loadEvents();
-        } else if (!isBlank(currentEventId)) {
-            currentEventId = "";
-            currentEventTitle = "";
-            prefs.edit().remove(KEY_EVENT_ID).remove(KEY_EVENT_TITLE).apply();
-            loadEvents();
+        if (scannerActive) {
+            showScannerDashboard();
         } else {
             super.onBackPressed();
         }
