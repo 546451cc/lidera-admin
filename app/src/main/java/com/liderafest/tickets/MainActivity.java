@@ -111,10 +111,22 @@ public class MainActivity extends Activity {
         }
     }
 
+    private int systemBarTopInset() {
+        int id = getResources().getIdentifier("status_bar_height", "dimen", "android");
+        return id > 0 ? getResources().getDimensionPixelSize(id) : 0;
+    }
+
+    private int systemBarBottomInset() {
+        int id = getResources().getIdentifier("navigation_bar_height", "dimen", "android");
+        return id > 0 ? getResources().getDimensionPixelSize(id) : 0;
+    }
+
     private void showShell() {
         root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setBackgroundColor(BONE);
+        root.setPadding(0, systemBarTopInset(), 0, 0);
+        root.setClipToPadding(false);
         setContentView(root);
         renderTopBar();
 
@@ -132,44 +144,29 @@ public class MainActivity extends Activity {
         bar.setBackgroundColor(INDIGO);
 
         screenTitle = new TextView(this);
-        screenTitle.setText("Lidera\nTickets");
+        screenTitle.setText("Lidera Tickets");
         screenTitle.setTextColor(Color.WHITE);
-        screenTitle.setTextSize(17);
+        screenTitle.setTextSize(20);
         screenTitle.setTypeface(Typeface.DEFAULT_BOLD);
         screenTitle.setGravity(Gravity.CENTER_VERTICAL);
-        bar.addView(screenTitle, new LinearLayout.LayoutParams(0, dp(54), 1));
-
-        Button events = topButton("Eventos");
-        events.setOnClickListener(v -> requireSessionThenEvents());
-        bar.addView(events);
-
-        Button scanner = topButton("Escáner");
-        scanner.setOnClickListener(v -> {
-            if (isBlank(prefs.getString(KEY_TOKEN, ""))) {
-                showLogin();
-            } else if (isBlank(currentListShortId)) {
-                loadEvents();
-            } else {
-                showScannerDashboard();
-            }
-        });
-        bar.addView(scanner);
+        screenTitle.setSingleLine(true);
+        bar.addView(screenTitle, new LinearLayout.LayoutParams(0, dp(52), 1));
 
         Button logout = topButton("Salir");
         logout.setOnClickListener(v -> logout());
         bar.addView(logout);
 
-        root.addView(bar, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(66)));
+        root.addView(bar, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(64)));
     }
 
     private Button topButton(String text) {
         Button b = new Button(this);
         b.setAllCaps(false);
         b.setText(text);
-        b.setTextSize(12);
+        b.setTextSize(11);
         b.setTextColor(Color.WHITE);
-        b.setBackground(bg(INDIGO, 0, Color.parseColor("#24486F"), 1));
-        LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(dp(88), dp(48));
+        b.setBackground(bg(Color.parseColor("#24486F"), dp(14), Color.parseColor("#31587F"), 1));
+        LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(dp(74), dp(42));
         p.setMargins(dp(4), 0, 0, 0);
         b.setLayoutParams(p);
         return b;
@@ -187,13 +184,13 @@ public class MainActivity extends Activity {
         scroll.setFillViewport(true);
         scroll.setBackgroundColor(BONE);
         content.setOrientation(LinearLayout.VERTICAL);
-        content.setPadding(dp(20), dp(18), dp(20), dp(28));
+        content.setPadding(dp(20), dp(20), dp(20), dp(28) + systemBarBottomInset());
         scroll.addView(content, new ScrollView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         return scroll;
     }
 
     private void showLogin() {
-        screenTitle.setText("Lidera\nTickets");
+        screenTitle.setText("Lidera Tickets");
         LinearLayout content = new LinearLayout(this);
         setContent(scrollWith(content));
 
@@ -307,7 +304,7 @@ public class MainActivity extends Activity {
 
     private void showAccountChooser(JSONArray accounts) {
         showLoading(false);
-        screenTitle.setText("Elegir\nCuenta");
+        screenTitle.setText("Elegir cuenta");
         LinearLayout content = new LinearLayout(this);
         setContent(scrollWith(content));
         content.addView(title("Elige la cuenta"));
@@ -482,6 +479,10 @@ public class MainActivity extends Activity {
         content.addView(pill("Lista: " + safe(currentListName) + " · " + safe(currentListShortId)));
         content.addView(paragraph("Escanea el QR del ticket. El QR de Hi.Events contiene el public_id del asistente, por ejemplo A-XXXX."));
 
+        Button eventsButton = secondaryButton("Cambiar evento o lista");
+        eventsButton.setOnClickListener(v -> loadEvents());
+        content.addView(eventsButton);
+
         Button scan = primaryButton("Escanear QR");
         scan.setOnClickListener(v -> startQrScan());
         content.addView(scan);
@@ -515,11 +516,16 @@ public class MainActivity extends Activity {
             return;
         }
         IntentIntegrator integrator = new IntentIntegrator(this);
+        integrator.setCaptureActivity(LideraCaptureActivity.class);
         integrator.setDesiredBarcodeFormats(IntentIntegrator.QR_CODE);
         integrator.setPrompt("Escanea el QR del ticket");
         integrator.setBeepEnabled(true);
-        integrator.setOrientationLocked(false);
-        integrator.initiateScan();
+        integrator.setOrientationLocked(true);
+        try {
+            integrator.initiateScan();
+        } catch (Exception ex) {
+            showResult(false, "No se pudo abrir cámara", "Error: " + ex.getMessage());
+        }
     }
 
     @Override

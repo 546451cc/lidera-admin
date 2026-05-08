@@ -10,8 +10,8 @@ android {
         applicationId 'com.liderafest.tickets'
         minSdk 23
         targetSdk 35
-        versionCode 10
-        versionName '2.0.0-api'
+        versionCode 11
+        versionName '2.0.1-api-fix'
     }
 
     compileOptions {
