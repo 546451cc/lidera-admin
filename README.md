@@ -33,3 +33,7 @@ Esta versión ya no usa WebView para login ni para seleccionar eventos/listas.
 - Cambia el scanner QR a modo inline dentro de la misma pantalla para evitar cierres al aceptar permisos en Xiaomi/MIUI.
 - Incluye una keystore debug fija en `app/lidera-debug.keystore`, para que los próximos APK de GitHub Actions puedan actualizarse encima sin conflicto de firma.
 - Fuerza Node 24 en GitHub Actions para evitar el warning de Node.js 20 deprecated.
+
+## v2.0.3
+
+- Corrige el error de compilación causado por un fragmento residual de `onActivityResult`.

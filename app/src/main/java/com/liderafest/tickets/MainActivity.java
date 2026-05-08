@@ -609,12 +609,6 @@ public class MainActivity extends Activity {
         super.onPause();
     }
 
-            }
-            return;
-        }
-        super.onActivityResult(requestCode, resultCode, data);
-    }
-
     @Override
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
