@@ -1,0 +1,26 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.liderafest.tickets'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'com.liderafest.tickets'
+        minSdk 23
+        targetSdk 35
+        versionCode 10
+        versionName '2.0.0-api'
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    implementation 'com.journeyapps:zxing-android-embedded:4.3.0'
+    implementation 'com.google.zxing:core:3.5.3'
+}
